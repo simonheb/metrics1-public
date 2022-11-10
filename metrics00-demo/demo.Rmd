@@ -1,0 +1,521 @@
+---
+title: "Introductory econometrics - Illustrations"
+subtitle: "Free to use, happy to receive a mention if you find this useful for your class."
+date: "Winter 22/23"
+author: Simon Heß
+fontsize: 10pt
+classoption: compress
+output:
+  bookdown::beamer_presentation2:
+    slide_level: 3
+    theme: metropolis
+    highlight: haddock
+    keep_tex: yes
+    toc: no
+---
+
+
+```{r, echo = FALSE} 
+# code that I use to make beamer-overlay slides with r
+hook_plot <- knitr::knit_hooks$get("plot")
+knitr::knit_hooks$set(
+  plot = function(x, options) {
+    if (is.null(options$overlay.plot)) {
+      return(hook_plot(x, options))
+    } else {
+      i <- options$fig.cur
+      offset <- 0
+      if (is.null(options$offset)) {
+        overlay_offset <- 0
+      } else {
+        overlay_offset <- options$offset
+      } 
+      hand <- which(i==options$overlay.plot)
+      bf <- paste0("\\only<", i+overlay_offset, "| handout:", ifelse(is.null(hand),0,hand), ">{")
+      paste(c(bf, knitr::hook_plot_tex(x, options), "}"), collapse = "")
+    }
+  }
+)
+```
+
+
+
+# Sampling distribution of OLS
+
+```{r fig-sd, fig.width = 9, fig.height = 6, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+library(scales)
+set.seed(2)
+par(mar = c(2, 0.1, 3, 0))
+pop <- 5000             #population
+x <- runif(pop) * 2
+y <- x + rnorm(pop) / 2
+samples <- c(rep(0.006, 4000))
+olslines <- list()
+par(mfrow = c(1, 2))
+show_examples <- c(1:10, 25, 50, 100, 500, 1000, 5000, 10000)
+beta1 <- c()
+
+for (i in seq_along(samples)) {
+  sample_i <- sample(1:pop, pop * samples[i])
+  ols <- lm(y[sample_i] ~ x[sample_i])
+  olslines <- c(list(ols), olslines)
+  beta1 <- c(beta1, coefficients(ols)[2])
+  if (i %in% show_examples | i == length(samples)) {
+    plot(x, y,
+      col = alpha("grey", 0.1),
+      pch = 19,
+      xlim = c(.05, 2.05),
+      ylim = c(.4, 2.4),
+      main = paste0(
+        signif(length(olslines), 3), " line fits on ",
+        signif(length(olslines), 3)," samples"
+      ),
+      xaxt = 'n',
+      yaxt = 'n'
+    )
+    
+    for (olsold in olslines) {
+      abline(
+        reg = olsold,
+        col = alpha("darkslategray", 1 / sqrt(sqrt(i))),
+        lwd = 1.5
+      )
+    }
+    if (i < length(samples)) {
+      points(
+        x[sample_i],
+        y[sample_i],
+        col = alpha("indianred", 1),
+        pch = 19,
+        xlim = 1 + c(-1.05, 1.05),
+        ylim = 1 + c(-1.4, 1.4)
+      )
+      abline(reg = ols,
+             col = alpha("indianred", 1),
+             lwd = 5)
+    }
+    abline(
+      a = 0,
+      b = 1,
+      lwd = 3,
+      col = "black"
+    )
+    hist(
+      beta1,
+      breaks = 0.3 + 1.4 * (0:30) / 30,
+      main = paste0("histrogram of beta 1 across ", signif(length(olslines), 3), " samples"),
+      xlim = c(0.4, 1.6),
+      freq = F,
+      yaxt = 'n',
+      col = "darkslategray"
+    )
+  }
+}
+
+```
+
+
+# Sampling distribution of OLS under heteroskedasticity
+
+
+```{r fig-heteroscedacisity1, fig.width = 9, fig.height = 6, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+library(scales)
+
+set.seed(1234)
+par(mfrow = c(2, 2), mar = c(1.5, 2, 2, 1))
+
+n <- 1000
+x <- runif(n) ^ 1.7
+
+error <- rnorm(n)
+
+error_homo <- (runif(n) - 0.5) * ((abs(x)) ^ 0) + error / 5
+error_hetero <- (runif(n) - 0.5) * ((abs((x)) ^ 4)) + error / 100
+
+# make sure they have the same unconditional variance
+error_homo <- error_homo / sd(error_homo) / 2.5
+error_hetero <- error_hetero / sd(error_hetero) / 2.5
+
+y_homo <- 0.5 * x + error_homo
+y_hetero <- 0.5 * x + error_hetero
+
+samples <- rep(0.03, 1000) #the different samples to draw
+
+olslines_homo <- list() #where to save the line fits
+olslines_hetero <- list() #where to save the line fits
+show_examples <- c(1:10, 25, 50, 100, 500, 1000, 5000, 10000)
+
+for (i in seq_along(samples)) {
+  sample_i <- sample(1:n, n * samples[i])
+  ols_homo <- lm(y_homo[sample_i] ~ x[sample_i])
+  ols_hetero <- lm(y_hetero[sample_i] ~ x[sample_i])
+  cols <- ifelse(1:n %in% sample_i, "indianred", "grey50")
+  alphas <- ifelse(1:n %in% sample_i, 1, 0.4)
+  if (i %in% c(show_examples, length(samples))) {
+    
+    ##### plot 1 ######
+    plot(
+      x, y_homo,
+      col = alpha(cols, alphas), pch = 19,
+      xlim = c(-0.1, 1.1), ylim = c(-0.5, 1.5),
+      main = paste0(
+        "OLS on sample from pop with var(e)=",
+        round(var(error_homo), 4),
+        "=var(e|x)"
+      ),
+      ylab = "one sample"
+    )
+    abline(a = 0, b = 0.5, lwd = 3, col = "grey50")
+    abline(ols_homo, col = "indianred", lwd = 3)
+    
+    ##### plot 2 ######
+    plot(
+      x,
+      y_hetero,
+      col = alpha(cols, alphas), pch = 19,
+      xlim = c(-0.1, 1.1), ylim = c(-0.5, 1.5),
+      main = paste0(
+        "OLS  on sample from pop with var(e)=",
+        round(var(error_hetero), 4),
+        " != var(e|x)"
+      ),
+      ylab = paste0(i, " samples")
+    )
+    abline(a = 0, b = 0.5, lwd = 3, col = "grey50")
+    abline(ols_hetero, col = "indianred", lwd = 3)
+  }
+  
+  olslines_homo <- c(list(ols_homo), olslines_homo)
+  olslines_hetero <- c(list(ols_hetero), olslines_hetero)
+  
+  if (i %in% c(show_examples, length(samples))) {
+    # plot 3
+    plot(
+      x, y_homo,
+      col = alpha("grey", 0.1), pch = 19,
+      xlim = c(-0.1, 1.1), ylim = c(-0.4, 1.4)
+    )
+    for (ols in olslines_homo)
+      abline(reg = ols, col = alpha("darkslategray", 3 / log(1 + i)),lwd = 1)
+    abline(a = 0, b = 0.5, lwd = 3, col = "grey50")
+    
+    #plot 4
+    plot(
+      x, y_hetero,
+      col = alpha("grey", 0.1), pch = 19,
+      xlim = c(-0.1, 1.1), ylim = c(-0.4, 1.4)
+    )
+    for (ols in olslines_hetero)
+      abline(reg = ols, col = alpha("darkslategray", 3 / log(1 + i)), lwd = 1)
+    abline(a = 0, b = 0.5, lwd = 3, col = "grey50")
+  }
+}
+
+```
+
+# Measurement error
+## Measurement error in $y$ 
+
+```{r fig-yerror, fig.width = 10, fig.height = 7, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+library(scales)
+set.seed(123)
+n<-200
+x <- runif(n)
+error<-rnorm(n)
+y <- x 
+errorfactor <- c(0:10)/20
+for (factor in errorfactor) {
+  y0<-y+factor*error
+  ols<-lm(y0~x)
+  plot(x, y0, col = alpha("indianred",0.8), pch = 19, xlim = c(-0.5,1.5), ylim = c(-0.5,2.5))
+  text(x=0,y=2.5,adj=c(0,1),paste0(  "b_0=",round(ols$coefficients[1],2), "   b_1=",   round(ols$coefficients[2] ,2) ))
+  abline(0,1, col="gray", lwd = 3)
+  abline(ols, col="indianred", lwd = 3)
+}
+```
+## Measurement error in $x$ 
+
+```{r fig-xerror, fig.width = 10, fig.height = 7, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+set.seed(123)
+
+n<-200
+x <- runif(n)
+error<-rnorm(n)
+y <- x
+errorfactor <- c(0:10)/10
+for (factor in errorfactor) {
+  x0<-x+factor*error
+  ols<-lm(y~x0)
+  plot(x0, y, col = alpha("indianred",0.8), pch = 19, xlim = c(-0.5,2), ylim = c(-0.5,2))
+  text(x=0,y=2,adj=c(0,1),paste0(  "b_0=",round(ols$coefficients[1],2), "   b_1=",   round(ols$coefficients[2] ,2) ))
+  abline(0,1, col="gray", lwd = 3)
+  abline(lm(y~x0), col="indianred", lwd = 3)
+}
+```
+
+
+# Truncation
+## Truncated $y$ 
+
+```{r fig-truncation, fig.width = 10, fig.height = 7, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+set.seed(12345)
+library(scales)
+n<-500
+x <- runif(n)
+y <- x+rnorm(n)*0.2 - 0.75
+truncations <- c(-Inf, -1, 0,0.125, 0.25, 0.375, 0.5, 0.627,  0.75, 0.875, 1)-0.75
+for (truncation in truncations) {
+  sample_i <- which(y>truncation)
+  cols <- ifelse(1:n %in% sample_i, "indianred", "grey80")
+  alphas <- ifelse(1:n %in% sample_i, 1, 0.4)
+  plot(x, y, col = alpha(cols, alphas), pch = 19)
+  abline(a=-0.75,b=1, lwd = 3, col = "grey50")
+  abline(h=truncation, lwd = 3, col = "grey80")
+  abline(lm(y[sample_i] ~ x[sample_i]), col="indianred", lwd = 3)
+}
+```
+
+```{r eval=F}
+code
+```
+
+## Truncated $x$ 
+
+```{r fig-truncationx, fig.width = 10, fig.height = 7, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+set.seed(12345)
+library(scales)
+n <- 500
+x <- runif(n)
+y <- x + rnorm(n) * 0.2 - 0.75
+truncations <- c(-Inf, 0.125, 0.25, 0.375, 0.5, 0.627,  0.75)
+for (truncation in truncations) {
+  sample_i <- which(x > truncation)
+  cols <- ifelse(1:n %in% sample_i, "indianred", "grey80")
+  alphas <- ifelse(1:n %in% sample_i, 1, 0.4)
+  plot(x, y, col = alpha(cols, alphas), pch = 19)
+  abline(a = -0.75, b = 1, lwd = 3, col = "grey50")
+  abline(v = truncation, lwd = 3, col = "grey80")
+  abline(lm(y[sample_i] ~ x[sample_i]), col = "indianred", lwd = 3)
+}
+```
+
+
+
+# Convergence Concepts
+### WLLN -- Example
+
+After each roll,  each student computes the mean of their past rolls.
+
+This mean, $\bar{y}$, is our $y_n$, and the WLLN tells us that $y_n\overset{p}{\to}\mu=3.5$. 
+
+```{r fig-plim, fig.width = 8, fig.height = 4, out.width = "0.95\\textwidth", echo = FALSE, overlay.plot = c(1,7)}
+set.seed(12345)
+library(scales)
+n <- 5000
+k <- 100
+rolls <- matrix(round(runif(n * k) * 6 + 0.5), n, k)
+rolls[1, ] <-  rolls[2, ]  ##this is actually wrong, but makes the presentation easier
+means <- rolls
+for (i in 2:n) 
+  means[i, ] <- colMeans(rolls[1:i, ])
+layout(matrix(c(1, 1, 2), nrow = 1, ncol = 3, byrow = TRUE ))
+steps_to_plot <- c(2:10, 25, 50, 100, 1000, 5000)
+for (showsteps in steps_to_plot) {
+  par(mar = c(4, 2, 2, 0))
+  matplot(
+    y = means[1:showsteps, ],
+    x = 1:showsteps - 1,
+    type = 'l', lty = "solid", col = alpha("black", 0.1),
+    main = paste("Mean of", signif(showsteps - 1, -1), "roll(s) of a die"),
+    xlab = "n", xaxt = 'n',
+    xlim = c(0, max(10, showsteps + 1)),
+    ylab = "",
+    ylim = c(0.5, 6.5)
+  )
+  if (showsteps > 2)
+    axis(1)
+  points(
+    y = means[showsteps, ] + rnorm(k) * 0.04 * 2 / showsteps,
+    x = -1 + rep(showsteps, k) + runif(k) * 0.2,
+    col = alpha("indianred", 0.8), pch = 16, cex = 0.5
+  )
+  
+  yhist <-
+    hist(means[showsteps, ],
+         plot = FALSE,
+         breaks = seq(from = 0.5, to = 6.5, length.out = min(round(6 + sqrt(showsteps)), 30) )) # note: this uses probability=TRUE
+  par(mar = c(4, 1, 2, 2))
+  barplot(
+    yhist$counts,
+    axes = FALSE,
+    xlim = c(0, 100),
+    space = 0,
+    horiz = TRUE,
+    col = alpha("indianred", 0.6),
+    main = "Frequency"
+  ) # barplot
+  axis(1)
+}
+
+```
+
+### CLT  -- Example
+
+After each roll,  each student computes the mean of their past rolls.
+
+Before, we looked at $\bar{x}_n$, now we look at \textcolor{red}{$\sqrt{n}(\bar{x}_n-\mu)$}.
+
+The CLT tells us that this RV converges to \textcolor{blue}{$N(0,\sigma)$}.
+
+
+```{r fig-clt, fig.width = 8.5, fig.height = 4, out.width = "0.95\\textwidth", echo = FALSE, overlay.plot = c(1,5), echo=FALSE,warning=FALSE,message=FALSE}
+
+# somehow this is still a bit of, because base-r does not seem to allow me to align the histogram and the line plot axis. so i have to use a hacky way which sometimes shifts by a bit.
+set.seed(100)
+library(scales)
+library(Rfast)
+n <- 30
+k <- 10000
+plotbandwidth <- 8.4
+rolls <- matrix(round(runif(n * k) * 6 + 0.5), n, k)
+means <- rolls
+for (i in 2:n) 
+  means[i, ] <- Rfast::colmeans(rolls[1:i, ])
+
+means <- (means - 3.5) * sqrt(1:n)
+
+layout(matrix(c(1, 1, 2), nrow = 1, ncol = 3, byrow = TRUE))
+
+for (showsteps in c(1:5, 10, 15, 20, 25, 30)) {
+  par(mar = c(4, 2, 2, 0))
+  steps = sort(unique(means[showsteps, ]))
+  stepsize <- min(steps[2:length(steps)] - steps[1:(length(steps) - 1)])
+  
+  matplot(
+    y = matrix(means[1:showsteps, sample.int(k, round((showsteps / n) * k))], nrow =
+                 showsteps),
+    x = 1:showsteps - 1,
+    type = 'l',
+    ylim = c(-plotbandwidth, plotbandwidth),
+    lty = "solid",
+    col = alpha("black", 0.02),
+    xlim = c(0, max(10, showsteps)),
+    main = paste("sqrt(n)-scaled mean of", showsteps, "roll(s) of a die"),
+    xlab = "n",
+    ylab = "",
+    xaxt = 'n'
+  )
+  if (showsteps > 2)
+    axis(1)
+  
+  yhist <-
+    hist(
+      means[showsteps, ],
+      plot = FALSE,
+      breaks = seq(from = -plotbandwidth, to = plotbandwidth, stepsize)
+    )
+  yy <- seq(-plotbandwidth, plotbandwidth, 0.2)
+  points(
+    y = means[showsteps, ] + rnorm(k) * 0.05,
+    x = -1.5 + rep(showsteps, k) + runif(k) * 0.3 + 0.4,
+    cex = 0.2,
+    col = alpha("indianred", 0.8),
+    pch = 16
+  )
+  par(mar = c(4, 1, 2, 2))
+  barplot(
+    c(0, yhist$density),
+    ylim = c(-plotbandwidth, plotbandwidth),
+    width = c(-plotbandwidth + stepsize / 2, rep(stepsize, length(means[showsteps, ]))),
+    xlim = c(0, max(yhist$density, dnorm(yy, sd = sqrt(
+      35 / 12
+    )) * 2)),
+    axes = FALSE, space = 0, horiz = TRUE,
+    col = alpha("indianred", 0.6),
+    main = "Density"
+  ) # barplot
+  
+  lines(dnorm(yy, sd = sqrt(35 / 12)), yy, col = "blue", lw = 4) # line
+}
+
+```
+
+
+# CIs
+```{r fig-ci, fig.width = 10, fig.height = 6, out.width = "\\textwidth", echo = FALSE, overlay.plot = 1}
+library(scales)
+set.seed(123)
+par(mar = c(4, 4, 2, 1))
+pop <- 5000 #population
+x <- runif(pop) * 2
+true_beta_1 <- 1.2
+y <- true_beta_1 * x + rnorm(pop) / 2
+samples <- c(rep(0.006, 100))
+olslines <- list()
+par(mfrow = c(1, 2))
+show_examples <- sort(unique(c(1:10, 20 * (1:5))))
+cis <- matrix(NA, nrow = 0, ncol = 2)
+
+for (i in c(seq_along(samples), rep(length(samples), 10))) {
+  if (nrow(cis) < length(samples)) {
+    sample_i <- sample(1:pop, pop * samples[i])
+    ols <- lm(yy ~ xx, data = data.frame(yy = y[sample_i], xx = x[sample_i]))
+    olslines <- c(list(ols), olslines)
+    cis <- rbind(cis, confint(ols)[2, ])
+    
+    predx <- seq(0, 2, 0.01)
+    preds <- predict(ols, newdata = data.frame(xx = predx),
+                     interval = 'confidence')
+  }
+  if (i %in% show_examples) {
+    plot(x, y,
+      col = alpha("grey", 0.1), pch = 19,
+      main = paste0("OLS on sample. Population beta1=", true_beta_1),
+      xlim = c(-0.0, 2.0), ylim =  c(-0.4, 2.4),
+      xlab = "x", ylab = "y"
+    )
+    
+    if (i != length(samples)) {
+      points(x[sample_i], y[sample_i], col = alpha("indianred", 1), pch = 19)
+      
+      abline(reg = ols,
+             col = alpha("indianred", 1),
+             lwd = 5)
+
+      # shaded CI
+      polygon(c(rev(predx), predx), c(rev(preds[, 3]), preds[, 2]), col = alpha('indianred', 0.4), border = NA )
+      lines(predx, preds[, 3], lty = 'dashed', col = 'black')
+      lines(predx, preds[, 2], lty = 'dashed', col = 'black')
+      
+      text(x = 0.8, y = 0, adj = 0,
+        paste0("95%-CI for beta0: [", round(confint(ols)[1, 1], 2), ",", round(confint(ols)[1, 2], 2), "]"),
+        col = "indianred", cex = 1
+      )
+      text(x = 0.8, y = -0.25, adj = 0,
+        paste0("95%-CI for beta1: [", round(confint(ols)[2, 1], 2), ",", round(confint(ols)[2, 2], 2), "]"),
+        col = "indianred", cex = 1
+      )
+    }
+    abline(
+      a = 0, b = true_beta_1,
+      lwd = 3, col = "black"
+    )
+    
+    plot(
+      y = rep(1:nrow(cis), 3), x = cbind(cis, NA),
+      xlim = true_beta_1 + c(-0.6, 0.6), ylim = c(max(50, nrow(cis)), 0), pch = NA,
+      xlab = "beta1",
+      ylab = "sample",
+      main = paste0("CI for beta1. (True beta1 inside CI: ", round(100 * mean(cis[, 1] < true_beta_1 & true_beta_1 < cis[, 2]), 2), "%)"
+      )
+    )
+    lines(
+      y = t(cbind(1:nrow(cis), 1:nrow(cis), 1:nrow(cis) )),
+      x = t(cbind(cis, NA)),
+      lw = 4 / log(log(nrow(cis) + 1) + 1), col = alpha("darkslategray", 0.5)
+    )
+    abline(v = true_beta_1, col = "black", lw = 4, lty = 'dotted')
+    
+  }
+}
+```
