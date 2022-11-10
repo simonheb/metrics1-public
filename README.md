@@ -6,6 +6,10 @@ I am planning to publish the full lecture slidse with improved illustrations tow
 
 The slides are free to use, but of course I am happy to get mentioned.
 
+# So where are the relevant files?
+
+In `metrics00-demo`
+
 # Large file size
 
 The files can get extremely large, because they store thousands of lines in vector graphic format. To reduce filesize you either reduce the number of intermediatea steps that are shown or use `dev="png"` to store them as raster files.
