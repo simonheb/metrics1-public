@@ -10,7 +10,7 @@ output:
     slide_level: 3
     theme: metropolis
     highlight: haddock
-    keep_tex: yes
+    keep_tex: no
     toc: no
 ---
 
